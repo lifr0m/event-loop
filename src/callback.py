@@ -1,8 +1,10 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeAlias
+from typing import NamedTuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.loop import Loop
 
 
-Callback: TypeAlias = Callable[['Loop'], None]
+class Callback[*Ts](NamedTuple):
+    func: Callable[['Loop', *Ts], None]
+    args: tuple[*Ts] = ()

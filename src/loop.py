@@ -86,4 +86,4 @@ class Loop:
             self._callbacks[cond].remove(cb)
             if not self._callbacks[cond]:
                 self._callbacks.pop(cond)
-            cb(self)
+            cb.func(self, *cb.args)
