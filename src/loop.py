@@ -17,8 +17,8 @@ class State(enum.Enum):
 class Loop:
 
     def __init__(self) -> None:
-        self._state = State.STOPPED
         self._callbacks: dict[Condition, list[Callback]] = {}
+        self._state = State.STOPPED
 
     def time(self) -> float:
         return time.monotonic()
@@ -64,9 +64,7 @@ class Loop:
             else:
                 raise RuntimeError(f'unknown condition: {cond}')
 
-        r_list, w_list, x_list = select.select(
-            list(r_set), list(w_set), list(x_set), timeout
-        )
+        r_list, w_list, x_list = select.select(r_set, w_set, x_set, timeout)
         if x_list:
             raise RuntimeError(f'exceptional condition: {x_list}')
 
