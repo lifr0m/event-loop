@@ -5,6 +5,13 @@ from src.coroutine import Coroutine
 from src.loop import Loop
 
 
+def read_data(
+    sock: socket.socket
+) -> Coroutine[bytes]:
+    yield IOCondition(sock.fileno(), IOConditionKind.READ)
+    return sock.recv(4096)
+
+
 def async_main(
     loop: Loop,
     idx: int,
@@ -14,8 +21,7 @@ def async_main(
     try:
         sock.connect(('httpbin.org', 80))
         sock.sendall(b'GET /delay/3 HTTP/1.1\r\nHost: httpbin.org\r\n\r\n')
-        yield IOCondition(sock.fileno(), IOConditionKind.READ)
-        data = sock.recv(1024)
+        data = yield from read_data(sock)
         print(f'{idx=} elapsed={loop.time() - started_at} {data=}')
     finally:
         sock.close()

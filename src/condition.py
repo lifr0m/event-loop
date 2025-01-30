@@ -1,5 +1,5 @@
 import enum
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple
 
 
 class TimeCondition(NamedTuple):
@@ -16,4 +16,4 @@ class IOCondition(NamedTuple):
     kind: IOConditionKind
 
 
-Condition: TypeAlias = TimeCondition | IOCondition
+type Condition = TimeCondition | IOCondition

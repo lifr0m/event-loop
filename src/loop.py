@@ -76,13 +76,14 @@ class Loop:
         if x_list:
             raise RuntimeError(f'exceptional condition: {x_list}')
 
-        for cond, coro in [
+        time_ready = [
             (cond, coro)
             for cond, coro_list in self._coroutines.items()
             if isinstance(cond, TimeCondition)
             if cond.when <= self.time()
             for coro in coro_list
-        ] + [
+        ]
+        io_ready = [
             (IOCondition(fd, kind), coro)
             for fd_list, kind in [
                 (r_list, IOConditionKind.READ),
@@ -90,12 +91,16 @@ class Loop:
             ]
             for fd in fd_list
             for coro in self._coroutines[IOCondition(fd, kind)]
-        ]:
+        ]
+        ready = time_ready + io_ready
+
+        for cond, coro in ready:
             self._coroutines[cond].remove(coro)
             if not self._coroutines[cond]:
                 self._coroutines.pop(cond)
+
             try:
-                next_cond = next(coro)
+                next_cond = coro.send(None)
             except StopIteration:
                 pass
             else:

@@ -1,7 +1,6 @@
-from collections.abc import Iterator
-from typing import TypeAlias
+from collections.abc import Generator
 
 from src.condition import Condition
 
 
-Coroutine: TypeAlias = Iterator[Condition]
+type Coroutine[T = None] = Generator[Condition, None, T]
