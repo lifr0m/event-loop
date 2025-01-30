@@ -16,7 +16,7 @@ def async_main(
     loop: Loop,
     idx: int,
     started_at: float
-) -> Coroutine:
+) -> Coroutine[None]:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     try:
         sock.connect(('httpbin.org', 80))
