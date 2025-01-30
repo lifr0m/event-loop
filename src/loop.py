@@ -1,55 +1,63 @@
-import enum
 import select
 import time
 
-from .callback import Callback
-from .condition import Condition, IOCondition, IOConditionKind, TimeCondition
+from src.condition import Condition, IOCondition, IOConditionKind, TimeCondition
+from src.coroutine import Coroutine
 
 
 MAX_TIMEOUT = 60.0
 
 
-class State(enum.Enum):
-    STOPPED = 'stopped'
-    RUNNING = 'running'
-
-
 class Loop:
 
     def __init__(self) -> None:
-        self._callbacks: dict[Condition, list[Callback]] = {}
-        self._state = State.STOPPED
+        self._coroutines: dict[Condition, list[Coroutine]] = {}
+        self._running = False
 
     def time(self) -> float:
         return time.monotonic()
 
-    def is_running(self) -> bool:
-        return self._state == State.RUNNING
-
-    def add_callback(self,
-        condition: Condition,
-        callback: Callback
+    def schedule(self,
+        cond: Condition,
+        coro: Coroutine
     ) -> None:
-        self._callbacks.setdefault(condition, [])
-        self._callbacks[condition].append(callback)
+        self._coroutines.setdefault(cond, [])
+        self._coroutines[cond].append(coro)
+
+    def schedule_at(self,
+        when: float,
+        coro: Coroutine
+    ) -> None:
+        self.schedule(TimeCondition(when), coro)
+
+    def schedule_later(self,
+        delay: float,
+        coro: Coroutine
+    ) -> None:
+        self.schedule_at(self.time() + delay, coro)
+
+    def schedule_soon(self,
+        coro: Coroutine
+    ) -> None:
+        self.schedule_later(0, coro)
 
     def run(self) -> None:
-        if self.is_running():
+        if self._running:
             raise RuntimeError('loop is already running')
 
-        self._state = State.RUNNING
+        self._running = True
         try:
-            while self._callbacks:
+            while self._coroutines:
                 self._run_once()
         finally:
-            self._state = State.STOPPED
+            self._running = False
 
     def _run_once(self) -> None:
         r_set = set()
         w_set = set()
         x_set = set()
         timeout = MAX_TIMEOUT
-        for cond in self._callbacks:
+        for cond in self._coroutines:
             if isinstance(cond, TimeCondition):
                 delay = max(0.0, cond.when - self.time())
                 timeout = min(timeout, delay)
@@ -68,22 +76,27 @@ class Loop:
         if x_list:
             raise RuntimeError(f'exceptional condition: {x_list}')
 
-        for cond, cb in [
-            (cond, cb)
-            for cond, cb_list in self._callbacks.items()
+        for cond, coro in [
+            (cond, coro)
+            for cond, coro_list in self._coroutines.items()
             if isinstance(cond, TimeCondition)
             if cond.when <= self.time()
-            for cb in cb_list
+            for coro in coro_list
         ] + [
-            (IOCondition(fd, kind), cb)
+            (IOCondition(fd, kind), coro)
             for fd_list, kind in [
                 (r_list, IOConditionKind.READ),
                 (w_list, IOConditionKind.WRITE),
             ]
             for fd in fd_list
-            for cb in self._callbacks[IOCondition(fd, kind)]
+            for coro in self._coroutines[IOCondition(fd, kind)]
         ]:
-            self._callbacks[cond].remove(cb)
-            if not self._callbacks[cond]:
-                self._callbacks.pop(cond)
-            cb.func(self, *cb.args)
+            self._coroutines[cond].remove(coro)
+            if not self._coroutines[cond]:
+                self._coroutines.pop(cond)
+            try:
+                next_cond = next(coro)
+            except StopIteration:
+                pass
+            else:
+                self.schedule(next_cond, coro)
